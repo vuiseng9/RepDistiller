@@ -3,6 +3,7 @@ the general training framework
 """
 
 from __future__ import print_function
+from genericpath import exists
 
 import os
 import argparse
@@ -56,6 +57,9 @@ def parse_option():
     # dataset
     parser.add_argument('--dataset', type=str, default='cifar100', choices=['cifar100'], help='dataset')
 
+    # run_root
+    parser.add_argument('--run_root', type=str, default=None, help='root of the run')
+
     # model
     parser.add_argument('--model_s', type=str, default='resnet8',
                         choices=['resnet8', 'resnet14', 'resnet20', 'resnet32', 'resnet44', 'resnet56', 'resnet110',
@@ -94,12 +98,22 @@ def parse_option():
         opt.learning_rate = 0.01
 
     # set the path according to the environment
-    if hostname.startswith('visiongpu'):
-        opt.model_path = '/path/to/my/student_model'
-        opt.tb_path = '/path/to/my/student_tensorboards'
-    else:
-        opt.model_path = './save/student_model'
-        opt.tb_path = './save/student_tensorboards'
+    if opt.run_root is None:
+        raise ValueError("Please specify a valid run_root")
+    
+    os.makedirs(opt.run_root, exist_ok=True)
+    if not os.path.exists(opt.run_root):
+        raise ValueError("Please specify a valid run_root")
+    
+    opt.model_path = os.path.join(opt.run_root, "student_model")
+    opt.tb_path = os.path.join(opt.run_root, "student_tensorboards")
+    
+    # if hostname.startswith('visiongpu'):
+    #     opt.model_path = '/path/to/my/student_model'
+    #     opt.tb_path = '/path/to/my/student_tensorboards'
+    # else:
+    #     opt.model_path = './save/student_model'
+    #     opt.tb_path = './save/student_tensorboards'
 
     iterations = opt.lr_decay_epochs.split(',')
     opt.lr_decay_epochs = list([])
@@ -294,18 +308,20 @@ def main():
         print("==> training...")
 
         time1 = time.time()
-        train_acc, train_loss = train(epoch, train_loader, module_list, criterion_list, optimizer, opt)
+        train_acc, train_acc_top5, train_loss = train(epoch, train_loader, module_list, criterion_list, optimizer, opt, logger)
         time2 = time.time()
         print('epoch {}, total time {:.2f}'.format(epoch, time2 - time1))
 
-        logger.log_value('train_acc', train_acc, epoch)
-        logger.log_value('train_loss', train_loss, epoch)
+        logger.log_value('train/lr', optimizer.param_groups[0]['lr'], epoch)
+        logger.log_value('train/loss', train_loss, epoch)
+        logger.log_value('train/top1', train_acc, epoch)
+        logger.log_value('train/top5', train_acc_top5, epoch)
 
         test_acc, tect_acc_top5, test_loss = validate(val_loader, model_s, criterion_cls, opt)
 
-        logger.log_value('test_acc', test_acc, epoch)
-        logger.log_value('test_loss', test_loss, epoch)
-        logger.log_value('test_acc_top5', tect_acc_top5, epoch)
+        logger.log_value('test/loss', test_loss, epoch)
+        logger.log_value('test/top1', test_acc, epoch)
+        logger.log_value('test/top5', tect_acc_top5, epoch)
 
         # save the best model
         if test_acc > best_acc:

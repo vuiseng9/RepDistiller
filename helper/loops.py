@@ -65,9 +65,10 @@ def train_vanilla(epoch, train_loader, model, criterion, optimizer, opt):
     return top1.avg, losses.avg
 
 
-def train_distill(epoch, train_loader, module_list, criterion_list, optimizer, opt):
+def train_distill(epoch, train_loader, module_list, criterion_list, optimizer, opt, logger):
     """One epoch distillation"""
     # set modules as train()
+    bs=None
     for module in module_list:
         module.train()
     # set teacher as eval()
@@ -91,6 +92,7 @@ def train_distill(epoch, train_loader, module_list, criterion_list, optimizer, o
     top1 = AverageMeter()
     top5 = AverageMeter()
 
+    total_nbatch=len(train_loader)
     end = time.time()
     for idx, data in enumerate(train_loader):
         if opt.distill in ['crd']:
@@ -100,6 +102,9 @@ def train_distill(epoch, train_loader, module_list, criterion_list, optimizer, o
         data_time.update(time.time() - end)
 
         input = input.float()
+        if bs is None:
+            bs = len(input)
+
         if torch.cuda.is_available():
             input = input.cuda()
             target = target.cuda()
@@ -209,10 +214,17 @@ def train_distill(epoch, train_loader, module_list, criterion_list, optimizer, o
                 data_time=data_time, loss=losses, top1=top1, top5=top5))
             sys.stdout.flush()
 
+        step = epoch*total_nbatch + idx*bs
+        logger.log_value('train_minibatch/top1', top1.avg, step)
+        logger.log_value('train_minibatch/top5', top5.avg, step)
+        logger.log_value('train_minibatch/loss_point', losses.val, step)
+        logger.log_value('train_minibatch/loss', losses.avg, step)
+        logger.log_value('train_minibatch/lr', optimizer.param_groups[0]['lr'], step)
+
     print(' * Acc@1 {top1.avg:.3f} Acc@5 {top5.avg:.3f}'
           .format(top1=top1, top5=top5))
 
-    return top1.avg, losses.avg
+    return top1.avg, top5.avg, losses.avg
 
 
 def validate(val_loader, model, criterion, opt):
