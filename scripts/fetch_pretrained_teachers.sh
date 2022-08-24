@@ -1,8 +1,13 @@
+#!/usr/bin/env bash
 # fetch pre-trained teacher models
 
-mkdir -p save/models/
+PRETRAINED_ROOT=#your_path_to_save_pretrained
 
-cd save/models
+CWD=$(pwd)
+
+mkdir -p $PRETRAINED_ROOT
+
+cd $PRETRAINED_ROOT
 
 mkdir -p wrn_40_2_vanilla
 wget http://shape2prog.csail.mit.edu/repo/wrn_40_2_vanilla/ckpt_epoch_240.pth
@@ -28,4 +33,4 @@ mkdir -p ResNet50_vanilla
 wget http://shape2prog.csail.mit.edu/repo/ResNet50_vanilla/ckpt_epoch_240.pth
 mv ckpt_epoch_240.pth ResNet50_vanilla/
 
-cd ../..
+cd $CWD
